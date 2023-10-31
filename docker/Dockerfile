@@ -77,7 +77,7 @@ LABEL org.opencontainers.image.ref.name=${TAG}
 LABEL org.opencontainers.image.title="Cowrie SSH/Telnet Honeypot"
 LABEL org.opencontainers.image.description="Cowrie SSH/Telnet Honeypot"
 #LABEL org.opencontainers.image.base.digest="7beb0248fd81"
-LABEL org.opencontainers.image.base.name="gcr.io/distroless/python3-debian12"
+LABEL org.opencontainers.image.base.name="python:3.9.18-slim-bookworm"
 
 ENV COWRIE_GROUP=cowrie \
     COWRIE_USER=cowrie \
