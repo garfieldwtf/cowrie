@@ -61,7 +61,7 @@ RUN python3 -m venv cowrie-env && \
 COPY --chown=${COWRIE_USER}:${COWRIE_GROUP} . ${COWRIE_HOME}/cowrie-git
 
 
-FROM gcr.io/distroless/python3-debian12 AS runtime
+FROM python:3.9.18-slim-bookworm AS runtime
 #FROM gcr.io/distroless/python3-debian12:debug AS runtime
 
 LABEL org.opencontainers.image.created=${BUILD_DATE}
