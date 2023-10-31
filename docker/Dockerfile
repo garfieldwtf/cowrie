@@ -61,7 +61,7 @@ RUN python3 -m venv cowrie-env && \
 COPY --chown=${COWRIE_USER}:${COWRIE_GROUP} . ${COWRIE_HOME}/cowrie-git
 
 
-FROM python:3.9.18-slim-bookworm AS runtime
+FROM python:3.9.18-bookworm AS runtime
 #FROM gcr.io/distroless/python3-debian12:debug AS runtime
 
 LABEL org.opencontainers.image.created=${BUILD_DATE}
@@ -77,7 +77,7 @@ LABEL org.opencontainers.image.ref.name=${TAG}
 LABEL org.opencontainers.image.title="Cowrie SSH/Telnet Honeypot"
 LABEL org.opencontainers.image.description="Cowrie SSH/Telnet Honeypot"
 #LABEL org.opencontainers.image.base.digest="7beb0248fd81"
-LABEL org.opencontainers.image.base.name="python:3.9.18-slim-bookworm"
+LABEL org.opencontainers.image.base.name="python:3.9.18-bookworm"
 
 ENV COWRIE_GROUP=cowrie \
     COWRIE_USER=cowrie \
