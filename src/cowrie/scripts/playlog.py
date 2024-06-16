@@ -71,8 +71,7 @@ def playlog(fd, settings):
 
 def help(brief=0):
     print(
-        "Usage: %s [-bfhi] [-m secs] [-w file] <tty-log-file> <tty-log-file>...\n"
-        % os.path.basename(sys.argv[0])
+        f"Usage: {os.path.basename(sys.argv[0])} [-bfhi] [-m secs] [-w file] <tty-log-file> <tty-log-file>...\n"
     )
 
     if not brief:
@@ -104,8 +103,9 @@ def run():
     try:
         optlist, args = getopt.getopt(sys.argv[1:], "fhibcm:w:", ["help"])
     except getopt.GetoptError as error:
-        print("Error: %s\n" % error)
+        print(f"Error: {error}\n")
         help()
+        return
 
     options = [x[0] for x in optlist]
     if "-b" in options and "-i" in options:
@@ -129,13 +129,12 @@ def run():
     if len(args) < 1:
         help()
 
-    try:
-        for logfile in args:
-            logfd = open(logfile, "rb")
-            playlog(logfd, settings)
-    except OSError:
-        print("\n\n[!] Couldn't open log file (%s)!" % logfile)
-        sys.exit(2)
+    for logfile in args:
+        try:
+            with open(logfile, "rb") as f:
+                playlog(f, settings)
+        except OSError:
+            print(f"\n[!] Couldn't open log file {logfile}!")
 
 
 if __name__ == "__main__":
