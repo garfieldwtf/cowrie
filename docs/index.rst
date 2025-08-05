@@ -26,13 +26,13 @@ Welcome to Cowrie's documentation!
    elk/README.rst
    graylog/README.rst
    kippo-graph/README.rst
+   prometheus/README.rst
    sentinel/README.rst
    splunk/README.rst
    sql/README.rst
    squid/README.rst
    supervisor/README.rst
    systemd/README.rst
-   threatjammer/README.rst
 
 Indices and tables
 ==================

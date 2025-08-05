@@ -6,13 +6,15 @@ from __future__ import annotations
 
 import random
 import re
-from typing import Any
-from collections.abc import Callable
+from typing import Any, TYPE_CHECKING
 
 from twisted.internet import defer, reactor
 from twisted.internet.defer import inlineCallbacks
 
 from cowrie.shell.command import HoneyPotCommand
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 commands = {}
 
@@ -142,8 +144,7 @@ pages for more information and options.
         self.write("The following NEW packages will be installed:\n")
         self.write("  {} ".format(" ".join(self.packages)) + "\n")
         self.write(
-            "0 upgraded, %d newly installed, 0 to remove and 259 not upgraded.\n"
-            % len(self.packages)
+            f"0 upgraded, {len(self.packages)} newly installed, 0 to remove and 259 not upgraded.\n"
         )
         self.write(f"Need to get {totalsize}.2kB of archives.\n")
         self.write(
@@ -152,8 +153,9 @@ pages for more information and options.
         i = 1
         for p in self.packages:
             self.write(
-                "Get:%d http://ftp.debian.org stable/main %s %s [%s.2kB]\n"
-                % (i, p, self.packages[p]["version"], self.packages[p]["size"])
+                "Get:{} http://ftp.debian.org stable/main {} {} [{}.2kB]\n".format(
+                    i, p, self.packages[p]["version"], self.packages[p]["size"]
+                )
             )
             i += 1
             yield self.sleep(1, 2)
@@ -178,10 +180,16 @@ pages for more information and options.
             self.write(
                 "Setting up {} ({}) ...\n".format(p, self.packages[p]["version"])
             )
-            self.fs.mkfile(f"/usr/bin/{p}", 0, 0, random.randint(10000, 90000), 33188)
-            self.protocol.commands[
-                f"/usr/bin/{p}"
-            ] = Command_faked_package_class_factory.getCommand(p)
+            self.fs.mkfile(
+                f"/usr/bin/{p}",
+                self.protocol.user.uid,
+                self.protocol.user.gid,
+                random.randint(10000, 90000),
+                33188,
+            )
+            self.protocol.commands[f"/usr/bin/{p}"] = (
+                Command_faked_package_class_factory.getCommand(p)
+            )
             yield self.sleep(2)
         self.exit()
 
@@ -204,4 +212,8 @@ pages for more information and options.
 
 
 commands["/usr/bin/apt-get"] = Command_aptget
+commands["/bin/apt-get"] = Command_aptget
 commands["apt-get"] = Command_aptget
+commands["/usr/bin/apt"] = Command_aptget
+commands["/bin/apt"] = Command_aptget
+commands["apt"] = Command_aptget

@@ -10,8 +10,7 @@ from __future__ import annotations
 import hashlib
 import random
 import re
-from typing import Any
-from collections.abc import Callable
+from typing import Any, TYPE_CHECKING
 
 from twisted.internet import defer
 from twisted.internet import reactor
@@ -19,6 +18,9 @@ from twisted.internet.defer import inlineCallbacks
 from twisted.python import log
 
 from cowrie.shell.command import HoneyPotCommand
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 arch = "x86_64"
 commands = {}
@@ -255,7 +257,7 @@ Options:
         self.write(f"Install  {len(self.packages)} Packages\n\n")
 
         self.write(f"Total download size: {totalsize} k\n")
-        self.write(f"Installed size: {0.0032*totalsize:.1f} M\n")
+        self.write(f"Installed size: {0.0032 * totalsize:.1f} M\n")
         self.write("Is this ok [y/d/N]: ")
         # Assume 'yes'
 

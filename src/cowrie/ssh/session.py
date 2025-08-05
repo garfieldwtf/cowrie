@@ -5,7 +5,6 @@
 This module contains ...
 """
 
-
 from __future__ import annotations
 
 from typing import Literal
@@ -26,8 +25,11 @@ class HoneyPotSSHSession(session.SSHSession):
     def request_env(self, data: bytes) -> Literal[0, 1]:
         name, rest = getNS(data)
         value, rest = getNS(rest)
+
         if rest:
-            raise ValueError("Bad data given in env request")
+            log.msg(f"Extra data in request_env: {rest!r}")
+            return 1
+
         log.msg(
             eventid="cowrie.client.var",
             format="request_env: %(name)s=%(value)s",

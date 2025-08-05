@@ -40,7 +40,7 @@ from twisted.conch.ssh.common import getNS
 from twisted.internet import reactor
 from twisted.internet.endpoints import TCP4ClientEndpoint
 from twisted.protocols.policies import TimeoutMixin
-from twisted.python import log, randbytes
+from twisted.python import failure, log, randbytes
 
 from cowrie.core.config import CowrieConfig
 from cowrie.ssh_proxy import client_transport
@@ -130,11 +130,10 @@ class FrontendSSHTransport(transport.SSHServerTransport, TimeoutMixin):
             backend_port = CowrieConfig.getint("proxy", "backend_ssh_port")
             self.connect_to_backend(backend_ip, backend_port)
 
-    def pool_connection_error(self, reason):
-        log.msg(
-            f"Connection to backend pool refused: {reason.value}. Disconnecting frontend..."
-        )
-        self.transport.loseConnection()
+    def pool_connection_error(self, reason: failure.Failure) -> None:
+        log.msg(f"Connection to backend pool refused: {reason.value}")
+        if self.transport:
+            self.transport.loseConnection()
 
     def pool_connection_success(self, pool_interface):
         log.msg("Connected to backend pool")
@@ -156,11 +155,10 @@ class FrontendSSHTransport(transport.SSHServerTransport, TimeoutMixin):
 
             self.connect_to_backend(honey_ip, ssh_port)
 
-    def backend_connection_error(self, reason):
-        log.msg(
-            f"Connection to honeypot backend refused: {reason.value}. Disconnecting frontend..."
-        )
-        self.transport.loseConnection()
+    def backend_connection_error(self, reason: failure.Failure) -> None:
+        log.msg(f"Connection to honeypot backend refused: {reason.value}")
+        if self.transport:
+            self.transport.loseConnection()
 
     def backend_connection_success(self, backendTransport):
         log.msg("Connected to honeypot backend")
@@ -368,8 +366,13 @@ class FrontendSSHTransport(transport.SSHServerTransport, TimeoutMixin):
 
         if self.pool_interface:
             # free VM from pool (VM was used if we performed SSH authentication to the backend)
-            vm_dirty = self.sshParse.client.authDone if self.sshParse.client else False
-            self.pool_interface.send_vm_free(vm_dirty)
+            try:
+                vm_dirty = (
+                    self.sshParse.client.authDone if self.sshParse.client else False
+                )
+                self.pool_interface.send_vm_free(vm_dirty)
+            except AttributeError:
+                pass
 
             # close transport connection to pool
             self.pool_interface.transport.loseConnection()

@@ -4,6 +4,7 @@ Telnet Transport and Authentication for the Honeypot
 
 @author: Olivier Bilodeau <obilodeau@gosecure.ca>
 """
+
 from __future__ import annotations
 
 
@@ -17,7 +18,8 @@ from twisted.conch.telnet import (
     AuthenticatingTelnetProtocol,
     ITelnetProtocol,
 )
-from twisted.python import log
+from twisted.internet.protocol import connectionDone
+from twisted.python import failure, log
 
 from cowrie.core.config import CowrieConfig
 from cowrie.core.credentials import UsernamePasswordIP
@@ -45,7 +47,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         self.transport.write(self.factory.banner.replace(b"\n", b"\r\r\n"))
         self.transport.write(self.loginPrompt)
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason: failure.Failure = connectionDone) -> None:
         """
         Fires on pre-authentication disconnects
         """
@@ -105,7 +107,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
 
         # Remove the short timeout of the login prompt.
         self.transport.setTimeout(
-            CowrieConfig.getint("honeypot", "interactive_timeout", fallback=300)
+            CowrieConfig.getint("honeypot", "idle_timeout", fallback=300)
         )
 
         # replace myself with avatar protocol
@@ -129,7 +131,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         else:
             log.msg("Wrong number of NAWS bytes")
 
-    def enableLocal(self, option: bytes) -> bool:  # type: ignore
+    def enableLocal(self, option: bytes) -> bool:
         if option == ECHO:
             return True
         # TODO: check if twisted now supports SGA (see git commit c58056b0)
@@ -138,7 +140,7 @@ class HoneyPotTelnetAuthProtocol(AuthenticatingTelnetProtocol):
         else:
             return False
 
-    def enableRemote(self, option: bytes) -> bool:  # type: ignore
+    def enableRemote(self, option: bytes) -> bool:
         # TODO: check if twisted now supports LINEMODE (see git commit c58056b0)
         if option == LINEMODE:
             return False

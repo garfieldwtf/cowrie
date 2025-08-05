@@ -44,7 +44,7 @@ class ReconnectingConnectionPool(adbapi.ConnectionPool):
                 mysql.connector.errorcode.CR_SERVER_LOST,
                 mysql.connector.errorcode.ER_LOCK_DEADLOCK,
             ):
-                raise e
+                raise
 
             log.msg(f"output_mysql: got error {e!r}, retrying operation")
             conn = self.connections.get(self.threadID())
@@ -114,9 +114,9 @@ class Output(cowrie.core.output.Output):
                     f"output_mysql: SELECT `id` FROM `sensors` WHERE `ip` = '{self.sensor}'"
                 )
             r = yield self.db.runQuery(
-                f"SELECT `id` FROM `sensors` WHERE `ip` = '{self.sensor}'"
+                "SELECT `id` FROM `sensors` WHERE `ip` = %s",
+                (self.sensor,),
             )
-
             if r:
                 sensorid = r[0][0]
             else:
@@ -125,7 +125,8 @@ class Output(cowrie.core.output.Output):
                         f"output_mysql: INSERT INTO `sensors` (`ip`) VALUES ('{self.sensor}')"
                     )
                 yield self.db.runQuery(
-                    f"INSERT INTO `sensors` (`ip`) VALUES ('{self.sensor}')"
+                    "INSERT INTO `sensors` (`ip`) VALUES (%s)",
+                    (self.sensor,),
                 )
 
                 r = yield self.db.runQuery("SELECT LAST_INSERT_ID()")
@@ -229,7 +230,7 @@ class Output(cowrie.core.output.Output):
             )
 
             if r:
-                id = int(r[0][0])
+                clientid = int(r[0][0])
             else:
                 yield self.db.runQuery(
                     "INSERT INTO `clients` (`version`) VALUES (%s)",
@@ -237,10 +238,10 @@ class Output(cowrie.core.output.Output):
                 )
 
                 r = yield self.db.runQuery("SELECT LAST_INSERT_ID()")
-                id = int(r[0][0])
+                clientid = int(r[0][0])
             self.simpleQuery(
                 "UPDATE `sessions` SET `client` = %s WHERE `id` = %s",
-                (id, event["session"]),
+                (clientid, event["session"]),
             )
 
         elif event["eventid"] == "cowrie.client.size":

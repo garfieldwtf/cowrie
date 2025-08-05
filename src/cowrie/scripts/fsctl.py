@@ -72,9 +72,10 @@ def getpath(fs, path):
 def exists(fs, path):
     try:
         getpath(fs, path)
-        return True
     except FileNotFound:
         return False
+    else:
+        return True
 
 
 def is_directory(fs, path):
@@ -759,9 +760,11 @@ class fseditCmd(cmd.Cmd):
 def run():
     if len(sys.argv) < 2 or len(sys.argv) > 3:
         print(
-            "Usage: {} <fs.pickle> [command]".format(os.path.basename(
-                sys.argv[0],
-            ))
+            "Usage: {} <fs.pickle> [command]".format(
+                os.path.basename(
+                    sys.argv[0],
+                )
+            )
         )
         sys.exit(1)
 

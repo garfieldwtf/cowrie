@@ -2,19 +2,23 @@
 # See the COPYRIGHT file for more information
 
 from __future__ import annotations
+from http.client import responses
 
 import getopt
-import ipaddress
 import os
+from urllib import parse
 
 from twisted.internet import error
-from twisted.python import compat, log
+from twisted.internet.defer import inlineCallbacks
+from twisted.python import log
 
 import treq
 
 from cowrie.core.artifact import Artifact
+from cowrie.core.network import communication_allowed
 from cowrie.core.config import CowrieConfig
 from cowrie.shell.command import HoneyPotCommand
+
 
 commands = {}
 
@@ -182,18 +186,22 @@ class Command_curl(HoneyPotCommand):
 
     limit_size: int = CowrieConfig.getint("honeypot", "download_limit_size", fallback=0)
     outfile: str | None = None  # outfile is the file saved inside the honeypot
-    artifact: Artifact  # artifact is the file saved for forensics in the real file system
+    artifact: (
+        Artifact  # artifact is the file saved for forensics in the real file system
+    )
     currentlength: int = 0  # partial size during download
     totallength: int = 0  # total length
     silent: bool = False
+    head_request: bool = False
     url: bytes
     host: str
     port: int
 
-    def start(self) -> None:
+    @inlineCallbacks
+    def start(self):
         try:
             optlist, args = getopt.getopt(
-                self.args, "sho:O", ["help", "manual", "silent"]
+                self.args, "sho:OI", ["help", "manual", "silent", "head"]
             )
         except getopt.GetoptError as err:
             # TODO: should be 'unknown' instead of 'not recognized'
@@ -211,6 +219,8 @@ class Command_curl(HoneyPotCommand):
                 return
             elif opt[0] == "-s" or opt[0] == "--silent":
                 self.silent = True
+            elif opt[0] == "-I" or opt[0] == "--head":
+                self.head_request = True
 
         if len(args):
             if args[0] is not None:
@@ -224,7 +234,7 @@ class Command_curl(HoneyPotCommand):
 
         if "://" not in url:
             url = "http://" + url
-        urldata = compat.urllib_parse.urlparse(url)
+        urldata = parse.urlparse(url)
 
         for opt in optlist:
             if opt[0] == "-o":
@@ -253,7 +263,7 @@ class Command_curl(HoneyPotCommand):
 
         self.url = url.encode("ascii")
 
-        parsed = compat.urllib_parse.urlparse(url)
+        parsed = parse.urlparse(url)
         if parsed.scheme:
             scheme = parsed.scheme
         if scheme != "http" and scheme != "https":
@@ -271,14 +281,12 @@ class Command_curl(HoneyPotCommand):
             self.exit()
         self.port = parsed.port or (443 if scheme == "https" else 80)
 
-        # TODO: need to do full name resolution in case someon passes DNS name pointing to local address
-        try:
-            if ipaddress.ip_address(self.host).is_private:
-                self.errorWrite(f"curl: (6) Could not resolve host: {self.host}\n")
-                self.exit()
-                return None
-        except ValueError:
-            pass
+        allowed = yield communication_allowed(self.host)
+        if not allowed:
+            log.msg("Attempt to access blocked network address")
+            self.errorWrite(f"curl: (6) Could not resolve host: {self.host}\n")
+            self.exit()
+            return None
 
         self.artifact = Artifact("curl-download")
 
@@ -297,8 +305,10 @@ class Command_curl(HoneyPotCommand):
         # out_addr = None
         # if CowrieConfig.has_option("honeypot", "out_addr"):
         #     out_addr = (CowrieConfig.get("honeypot", "out_addr"), 0)
-
-        deferred = treq.get(url=url, allow_redirects=False, headers=headers, timeout=10)
+        if self.head_request:
+            deferred = treq.head(url=url, allow_redirects=False, headers=headers, timeout=10)
+        else:
+            deferred = treq.get(url=url, allow_redirects=False, headers=headers, timeout=10)
         return deferred
 
     def handle_CTRL_C(self) -> None:
@@ -311,6 +321,18 @@ class Command_curl(HoneyPotCommand):
         """
         self.totallength = response.length
         # TODO possible this is UNKNOWN_LENGTH
+
+        if self.head_request:
+            reason = responses.get(response.code, "")
+            self.write(f"HTTP/1.1 {response.code} {reason}\n")
+            for key, values in response.headers.getAllRawHeaders():
+                decoded_key = key.decode() if isinstance(key, bytes) else key
+                for value in values:
+                    decoded_value = value.decode() if isinstance(value, bytes) else value
+                    self.write(f"{decoded_key}: {decoded_value}\n")
+            self.exit()
+            return
+
         if self.limit_size > 0 and self.totallength > self.limit_size:
             log.msg(
                 f"Not saving URL ({self.url.decode()}) (size: {self.totallength}) exceeds file size limit ({self.limit_size})"
@@ -362,9 +384,14 @@ class Command_curl(HoneyPotCommand):
             self.write("\n")
 
         # Update the honeyfs to point to artifact file if output is to file
-        if self.outfile:
-            self.fs.mkfile(self.outfile, 0, 0, self.currentlength, 33188)
-            self.fs.chown(self.outfile, self.protocol.user.uid, self.protocol.user.gid)
+        if self.outfile and self.protocol.user:
+            self.fs.mkfile(
+                self.outfile,
+                self.protocol.user.uid,
+                self.protocol.user.gid,
+                self.currentlength,
+                33188,
+            )
             self.fs.update_realfile(
                 self.fs.getfile(self.outfile), self.artifact.shasumFilename
             )

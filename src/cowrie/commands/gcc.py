@@ -9,10 +9,13 @@ import re
 import time
 
 from twisted.internet import reactor
-from twisted.internet.defer import Deferred
 
 from cowrie.core.config import CowrieConfig
 from cowrie.shell.command import HoneyPotCommand
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from twisted.internet.defer import Deferred
 
 commands = {}
 
@@ -53,7 +56,7 @@ class Command_gcc(HoneyPotCommand):
 
     scheduled: Deferred
 
-    def start(self) -> None:
+    def call(self) -> None:
         """
         Parse as much as possible from a GCC syntax and generate the output
         that is requested. The file that is generated can be read (and will)
@@ -148,17 +151,16 @@ class Command_gcc(HoneyPotCommand):
 
     def no_files(self) -> None:
         """
-        Notify user there are no input files, and exit
+        Notify user there are no input files
         """
         self.write(
             """gcc: fatal error: no input files
 compilation terminated.\n"""
         )
-        self.exit()
 
     def version(self, short: bool) -> None:
         """
-        Print long or short version, and exit
+        Print long or short version
         """
 
         # Generate version number
@@ -181,7 +183,6 @@ gcc version {version} (Debian {version}-5)"""
 
         # Write
         self.write(f"{data}\n")
-        self.exit()
 
     def generate_file(self, outfile: str) -> None:
         data = b""
@@ -193,7 +194,7 @@ gcc version {version} (Debian {version}-5)"""
             re.sub("[^A-Za-z0-9]", "_", outfile),
         )
         safeoutfile = os.path.join(
-            CowrieConfig.get("honeypot", "download_path"), tmp_fname
+            CowrieConfig.get("honeypot", "download_path", fallback="."), tmp_fname
         )
 
         # Data contains random garbage from an actual file, so when
@@ -212,9 +213,10 @@ gcc version {version} (Debian {version}-5)"""
         outfile = self.fs.resolve_path(outfile, self.protocol.cwd)
 
         # Create file for the protocol
-        self.fs.mkfile(outfile, 0, 0, len(data), 33188)
+        self.fs.mkfile(
+            outfile, self.protocol.user.uid, self.protocol.user.gid, len(data), 33188
+        )
         self.fs.update_realfile(self.fs.getfile(outfile), safeoutfile)
-        self.fs.chown(outfile, self.protocol.user.uid, self.protocol.user.gid)
 
         # Segfault command
         class segfault_command(HoneyPotCommand):
@@ -224,15 +226,11 @@ gcc version {version} (Debian {version}-5)"""
         # Trick the 'new compiled file' as an segfault
         self.protocol.commands[outfile] = segfault_command
 
-        # Done
-        self.exit()
-
     def arg_missing(self, arg: str) -> None:
         """
         Print missing argument message, and exit
         """
         self.write(f"{Command_gcc.APP_NAME}: argument to '{arg}' is missing\n")
-        self.exit()
 
     def help(self) -> None:
         """
@@ -302,7 +300,6 @@ For bug reporting instructions, please see:
 <file:///usr/share/doc/gcc-4.7/README.Bugs>.
 """
         )
-        self.exit()
 
 
 commands["/usr/bin/gcc"] = Command_gcc

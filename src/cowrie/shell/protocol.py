@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 import os
 import socket
 import sys
@@ -14,6 +15,7 @@ from typing import ClassVar
 from twisted.conch import recvline
 from twisted.conch.insults import insults
 from twisted.internet import error
+from twisted.internet.protocol import connectionDone
 from twisted.protocols.policies import TimeoutMixin
 from twisted.python import failure, log
 
@@ -27,12 +29,10 @@ class HoneyPotBaseProtocol(insults.TerminalProtocol, TimeoutMixin):
     Base protocol for interactive and non-interactive use
     """
 
-    commands: ClassVar = {}
+    commands: ClassVar[dict] = {}
     for c in cowrie.commands.__all__:
         try:
-            module = __import__(
-                f"cowrie.commands.{c}", globals(), locals(), ["commands"]
-            )
+            module = import_module(f"cowrie.commands.{c}")
             commands.update(module.commands)
         except ImportError as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -94,8 +94,8 @@ class HoneyPotBaseProtocol(insults.TerminalProtocol, TimeoutMixin):
 
         log.msg(eventid="cowrie.session.params", arch=self.user.server.arch)
 
-        timeout = CowrieConfig.getint("honeypot", "interactive_timeout", fallback=180)
-        self.setTimeout(timeout)
+        idle_timeout = CowrieConfig.getint("honeypot", "idle_timeout", fallback=180)
+        self.setTimeout(idle_timeout)
 
         # Source IP of client in user visible reports (can be fake or real)
         self.clientIP = CowrieConfig.get(
@@ -120,7 +120,7 @@ class HoneyPotBaseProtocol(insults.TerminalProtocol, TimeoutMixin):
         ret = failure.Failure(error.ProcessTerminated(exitCode=1))
         self.terminal.transport.processEnded(ret)
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason: failure.Failure = connectionDone) -> None:
         """
         Called when the connection is shut down.
         Clear any circular references here, and any external references to
@@ -167,7 +167,7 @@ class HoneyPotBaseProtocol(insults.TerminalProtocol, TimeoutMixin):
                     break
 
         txt = os.path.normpath(
-            "{}/txtcmds/{}".format(CowrieConfig.get("honeypot", "share_path"), path)
+            "{}/txtcmds/{}".format(CowrieConfig.get("honeypot", "data_path"), path)
         )
         if os.path.exists(txt) and os.path.isfile(txt):
             return self.txtcmd(txt)
@@ -190,6 +190,8 @@ class HoneyPotBaseProtocol(insults.TerminalProtocol, TimeoutMixin):
             self.cmdstack[-1].lineReceived(string)
         else:
             log.msg(f"discarding input {string}")
+            stat = failure.Failure(error.ProcessDone(status=""))
+            self.terminal.transport.processEnded(stat)
 
     def call_command(self, pp, cmd, *args):
         self.pp = pp
@@ -294,7 +296,7 @@ class HoneyPotInteractiveProtocol(HoneyPotBaseProtocol, recvline.HistoricRecvLin
         self.terminal.write(b"timed out waiting for input: auto-logout\n")
         HoneyPotBaseProtocol.timeoutConnection(self)
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason: failure.Failure = connectionDone) -> None:
         HoneyPotBaseProtocol.connectionLost(self, reason)
         recvline.HistoricRecvLine.connectionLost(self, reason)
         self.keyHandlers = {}
@@ -314,6 +316,7 @@ class HoneyPotInteractiveProtocol(HoneyPotBaseProtocol, recvline.HistoricRecvLin
         """
         Easier way to implement password input?
         """
+        self.resetTimeout()  # Reset the idle timeout
         if self.mode == "insert":
             self.lineBuffer.insert(self.lineBufferIndex, ch)
         else:

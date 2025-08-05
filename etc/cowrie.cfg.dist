@@ -43,8 +43,8 @@ download_path = ${honeypot:state_path}/downloads
 
 # Directory for static data files
 #
-# (default: share/cowrie)
-share_path = share/cowrie
+# (default: src/cowrie/cowrie)
+data_path = src/cowrie/data
 
 
 # Directory for variable state files
@@ -99,19 +99,30 @@ ttylog = true
 # (default: ttylog_path = %(state_path)s/tty)
 ttylog_path = ${honeypot:state_path}/tty
 
-# Interactive timeout determines when logged in sessions are
+# Idle timeout determines when logged in sessions are
 # terminated for being idle. In seconds.
 # (default: 180)
-interactive_timeout = 180
+idle_timeout = 180
 
 # Authentication Timeout
-# The server disconnects after this time if the user has not successfully logged in. 
+# The server disconnects after this time if the user has not successfully logged in.
 # The default is 120 seconds.
 authentication_timeout = 120
 
 # EXPERIMENTAL: back-end to user for Cowrie, options: proxy or shell
 # (default: shell)
 backend = shell
+
+# Logging Type
+# Valid options are `rotating` and `plain`.
+# Without a config file, the default is `plain`.
+#
+# Use `rotating` and Cowrie will log to `cowrie.log` and at midnight
+# rotate to `cowrie.log-<year>-<month>-<date>.log` and continue writing
+# to (a new) `cowrie.log`.
+# `plain` will write to `cowrie.log` and will not rotate. Use `plain`
+# if you want to use external log rotation solutions like `logrotate`
+logtype = rotating
 
 # Timezone Cowrie uses for logging
 # This can be any valid timezone for the TZ environment variable
@@ -193,7 +204,7 @@ auth_class = UserDB
 pool_only = false
 
 # time between full VM recycling (cleans older VMs and boots newer ones) - involves some downtime between cycles
-# -1 to disable
+# -1 to disable in seconds
 recycle_period = 1500
 
 # change interface below to allow connections from outside (e.g. remote pool)
@@ -204,7 +215,7 @@ save_snapshots = false
 snapshot_path = ${honeypot:state_path}/snapshots
 
 # pool xml configs
-config_files_path = ${honeypot:share_path}/pool_configs
+config_files_path = ${honeypot:data_path}/pool_configs
 
 network_config = default_network.xml
 nw_filter_config = default_filter.xml
@@ -380,13 +391,13 @@ log_raw = false
 # a real template linux installation.
 #
 # (default: fs.pickle)
-filesystem = ${honeypot:share_path}/fs.pickle
+filesystem = ${honeypot:data_path}/fs.pickle
 
 
 # File that contains output for the `ps` command.
 #
-# (default: share/cowrie/cmdoutput.json)
-processes = share/cowrie/cmdoutput.json
+# (default: ${honeypot_data_path}/cmdoutput.json)
+processes = ${honeypot:data_path}/cmdoutput.json
 
 
 # Fake architectures/OS
@@ -544,9 +555,8 @@ version = SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2
 # aes192-cbc
 # aes128-cbc
 # 3des-cbc
-# blowfish-cbc
 # cast128-cbc
-ciphers = aes128-ctr,aes192-ctr,aes256-ctr,aes256-cbc,aes192-cbc,aes128-cbc,3des-cbc,blowfish-cbc,cast128-cbc
+ciphers = aes128-ctr,aes192-ctr,aes256-ctr,aes256-cbc,aes192-cbc,aes128-cbc,3des-cbc,cast128-cbc
 
 
 # MAC Algorithm to be used.
@@ -583,7 +593,7 @@ compression = zlib@openssh.com,zlib,none
 # (use systemd: endpoint for systemd activation)
 # listen_endpoints = systemd:domain=INET:index=0
 # For both IPv4 and IPv6: listen_endpoints = tcp6:2222:interface=\:\:
-# Listening on multiple endpoints is supported with a single space seperator
+# Listening on multiple endpoints is supported with a single space separator
 # e.g listen_endpoints = "tcp:2222:interface=0.0.0.0 tcp:1022:interface=0.0.0.0" will result listening both on ports 2222 and 1022
 # use authbind for port numbers under 1024
 
@@ -640,9 +650,15 @@ forward_tunnel = false
 # (default: false)
 #auth_none_enabled = false
 
+# Public key authentication
+# This is an all or nothing switch that will allow none or any public key certificate to login
+#
+# (default: false)
+auth_publickey_allow_any = false
 
 # Configure keyboard-interactive login
 auth_keyboard_interactive_enabled = false
+
 
 # ============================================================================
 # Telnet Specific Options
@@ -658,7 +674,7 @@ enabled = false
 # (use systemd: endpoint for systemd activation)
 # listen_endpoints = systemd:domain=INET:index=0
 # For IPv4 and IPv6: listen_endpoints = tcp6:2223:interface=\:\: tcp:2223:interface=0.0.0.0
-# Listening on multiple endpoints is supported with a single space seperator
+# Listening on multiple endpoints is supported with a single space separator
 # e.g "listen_endpoints = tcp:2223:interface=0.0.0.0 tcp:2323:interface=0.0.0.0" will result listening both on ports 2223 and 2323
 # use authbind for port numbers under 1024
 
@@ -814,6 +830,23 @@ password = secret
 port = 3306
 debug = false
 
+
+# PostgresSQL logging module
+# Database structure for this module is supplied in docs/sql/postgres.sql
+#
+# PostgresSQL logging requires extra software: sudo apt-get install libpq-dev
+# PostgresSQL logging requires an extra Python module: pip install psycopg2
+#
+[output_postgresql]
+enabled = false
+host = localhost
+database = cowrie
+username = cowrie
+password = secret
+port = 5432
+debug = false
+
+
 # Rethinkdb output module
 # Rethinkdb output module requires extra Python module: pip install rethinkdb
 
@@ -858,6 +891,16 @@ token = 6A0EA6C6-8006-4E39-FC44-C35FF6E561A8
 index = cowrie
 sourcetype = cowrie
 source = cowrie
+
+
+# Prometheus logging module
+#
+# Prometheus requires an extra Python module: pip install prometheus_client
+#
+[output_prometheus]
+enabled = false
+port = 9000
+debug = false
 
 
 # HPFeeds3
@@ -1038,7 +1081,7 @@ enabled = false
 
 # Report login and session tracking attempts via the ThreatJammer.com Report API.
 # ThreatJammer.com is a risk assessment tool <https://threatjammer.com>
-# Read the docs for more information: https://cowrie.readthedocs.io/en/latest/threatjammer/README.html
+# Read the docs for more information: https://docs.cowrie.org/en/latest/threatjammer/README.html
 [output_threatjammer]
 enabled = false
 bearer_token = THREATJAMMER_API_TOKEN
@@ -1085,3 +1128,27 @@ authtype = instance_principals
 #tenancy_ocid = ocid1.tenancy.oc1..xxx
 #region = eu-stockholm-1
 #keyfile = /home/xx/key.pem
+
+[output_remotesyslog]
+enabled = false
+host = 127.0.0.1
+port = 514
+# protocol options: udp or tcp
+# (default: udp)
+protocol = udp
+
+[output_axiom]
+enabled = false
+api_token = fill_out_your_token_here
+dataset = cowrie
+
+# rabbitmq
+[output_rmq]
+enabled = false
+host = 127.0.0.1
+port = 5672
+username = guest
+password = guest
+vhost = /
+exchange = cowrie
+exchange_type = topic

@@ -1,12 +1,14 @@
 from __future__ import annotations
 from threading import Lock
 from typing import Any
+from typing import TYPE_CHECKING
 
-from twisted.internet.interfaces import IAddress
+if TYPE_CHECKING:
+    from twisted.python import failure
+    from twisted.internet.interfaces import IAddress
 from twisted.internet import protocol
-from twisted.internet.protocol import connectionDone
 from twisted.internet import reactor
-from twisted.python import failure
+from twisted.internet.protocol import connectionDone
 
 
 class ClientProtocol(protocol.Protocol):
@@ -82,9 +84,7 @@ class NATService:
 
     def __init__(self):
         self.bindings: dict[int, Any] = {}
-        self.lock = (
-            Lock()
-        )  # we need to be thread-safe just in case, this is accessed from multiple clients
+        self.lock = Lock()  # we need to be thread-safe just in case, this is accessed from multiple clients
 
     def request_binding(
         self, guest_id: int, dst_ip: str, ssh_port: int, telnet_port: int

@@ -25,16 +25,18 @@ from __future__ import annotations
 import hashlib
 import os
 import tempfile
-from types import TracebackType
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from twisted.python import log
 
 from cowrie.core.config import CowrieConfig
 
+if TYPE_CHECKING:
+    from types import TracebackType
+
 
 class Artifact:
-    artifactDir: str = CowrieConfig.get("honeypot", "download_path")
+    artifactDir: str = CowrieConfig.get("honeypot", "download_path", fallback=".")
 
     def __init__(self, label: str) -> None:
         self.label: str = label

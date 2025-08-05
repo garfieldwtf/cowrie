@@ -21,9 +21,13 @@ from twisted.python import log
 from cowrie.core.config import CowrieConfig
 
 
-def getRSAKeys():
-    publicKeyFile: str = CowrieConfig.get("ssh", "rsa_public_key")
-    privateKeyFile: str = CowrieConfig.get("ssh", "rsa_private_key")
+def getRSAKeys() -> tuple[bytes, bytes]:
+    publicKeyFile: str = CowrieConfig.get(
+        "ssh", "rsa_public_key", fallback="ssh_host_rsa_key.pub"
+    )
+    privateKeyFile: str = CowrieConfig.get(
+        "ssh", "rsa_private_key", fallback="ssh_host_rsa_key"
+    )
     if not (os.path.exists(publicKeyFile) and os.path.exists(privateKeyFile)):
         log.msg("Generating new RSA keypair...")
 
@@ -44,9 +48,13 @@ def getRSAKeys():
     return publicKeyString, privateKeyString
 
 
-def getDSAKeys():
-    publicKeyFile: str = CowrieConfig.get("ssh", "dsa_public_key")
-    privateKeyFile: str = CowrieConfig.get("ssh", "dsa_private_key")
+def getDSAKeys() -> tuple[bytes, bytes]:
+    publicKeyFile: str = CowrieConfig.get(
+        "ssh", "dsa_public_key", fallback="ssh_host_dsa_key.pub"
+    )
+    privateKeyFile: str = CowrieConfig.get(
+        "ssh", "dsa_private_key", fallback="ssh_host_dsa_key"
+    )
     if not (os.path.exists(publicKeyFile) and os.path.exists(privateKeyFile)):
         log.msg("Generating new DSA keypair...")
 
@@ -65,9 +73,13 @@ def getDSAKeys():
     return publicKeyString, privateKeyString
 
 
-def getECDSAKeys():
-    publicKeyFile: str = CowrieConfig.get("ssh", "ecdsa_public_key")
-    privateKeyFile: str = CowrieConfig.get("ssh", "ecdsa_private_key")
+def getECDSAKeys() -> tuple[bytes, bytes]:
+    publicKeyFile: str = CowrieConfig.get(
+        "ssh", "ecdsa_public_key", fallback="ssh_host_ecdsa_key.pub"
+    )
+    privateKeyFile: str = CowrieConfig.get(
+        "ssh", "ecdsa_private_key", fallback="ssh_host_ecdsa_key"
+    )
     if not (os.path.exists(publicKeyFile) and os.path.exists(privateKeyFile)):
         log.msg("Generating new ECDSA keypair...")
 
@@ -86,9 +98,13 @@ def getECDSAKeys():
     return publicKeyString, privateKeyString
 
 
-def geted25519Keys():
-    publicKeyFile: str = CowrieConfig.get("ssh", "ed25519_public_key")
-    privateKeyFile: str = CowrieConfig.get("ssh", "ed25519_private_key")
+def geted25519Keys() -> tuple[bytes, bytes]:
+    publicKeyFile: str = CowrieConfig.get(
+        "ssh", "ed25519_public_key", fallback="ssh_host_ed25519_key.pub"
+    )
+    privateKeyFile: str = CowrieConfig.get(
+        "ssh", "ed25519_private_key", fallback="ssh_host_ed25519_key"
+    )
     if not (os.path.exists(publicKeyFile) and os.path.exists(privateKeyFile)):
         log.msg("Generating new ed25519 keypair...")
 

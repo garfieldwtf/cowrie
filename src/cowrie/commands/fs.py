@@ -12,12 +12,15 @@ import copy
 import getopt
 import os.path
 import re
-from collections.abc import Callable
 
 from twisted.python import log
 
 from cowrie.shell import fs
 from cowrie.shell.command import HoneyPotCommand
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 commands: dict[str, Callable] = {}
 
@@ -123,7 +126,7 @@ class Command_tail(HoneyPotCommand):
 
     def tail_application(self, contents: bytes) -> None:
         contentsplit = contents.split(b"\n")
-        lines = int(len(contentsplit))
+        lines = len(contentsplit)
         if lines < self.n:
             self.n = lines - 1
         i = 0
@@ -181,32 +184,34 @@ class Command_head(HoneyPotCommand):
     head command
     """
 
-    n: int = 10
+    linecount: int = 10
+    bytecount: int = 0
 
     def head_application(self, contents: bytes) -> None:
-        i = 0
-        contentsplit = contents.split(b"\n")
-        for line in contentsplit:
-            if i < self.n:
+        if self.bytecount:
+            self.writeBytes(contents[: self.bytecount])
+        elif self.linecount:
+            linesplit = contents.split(b"\n")
+            for line in linesplit[: self.linecount]:
                 self.writeBytes(line + b"\n")
-            i += 1
 
     def head_get_file_contents(self, filename: str) -> None:
         try:
             contents = self.fs.file_contents(filename)
             self.head_application(contents)
-        except Exception:
+        except fs.FileNotFound:
             self.errorWrite(
                 f"head: cannot open `{filename}' for reading: No such file or directory\n"
             )
 
     def start(self) -> None:
-        self.n = 10
+        self.lines: int = 10
+        self.bytecount: int = 0
         if not self.args or self.args[0] == ">":
             return
         else:
             try:
-                optlist, args = getopt.getopt(self.args, "n:")
+                optlist, args = getopt.getopt(self.args, "c:n:")
             except getopt.GetoptError as err:
                 self.errorWrite(f"head: invalid option -- '{err.opt}'\n")
                 self.exit()
@@ -215,9 +220,16 @@ class Command_head(HoneyPotCommand):
             for opt in optlist:
                 if opt[0] == "-n":
                     if not opt[1].isdigit():
-                        self.errorWrite(f"head: illegal offset -- {opt[1]}\n")
+                        self.errorWrite(f"head: invalid number of lines: `{opt[1]}`\n")
                     else:
-                        self.n = int(opt[1])
+                        self.linecount = int(opt[1])
+                        self.bytecount = 0
+                elif opt[0] == "-c":
+                    if not opt[1].isdigit():
+                        self.errorWrite(f"head: invalid number of bytes: `{opt[1]}`\n")
+                    else:
+                        self.bytecount = int(opt[1])
+                        self.linecount = 0
 
         if not self.input_data:
             files = self.check_arguments("head", args)
@@ -357,7 +369,7 @@ or available locally via: info '(coreutils) rm invocation'\n"""
             pname = self.fs.resolve_path(f, self.protocol.cwd)
             try:
                 # verify path to file exists
-                dir = self.fs.get_path("/".join(pname.split("/")[:-1]))
+                directory = self.fs.get_path("/".join(pname.split("/")[:-1]))
                 # verify that the file itself exists
                 self.fs.get_path(pname)
             except (IndexError, fs.FileNotFound):
@@ -367,14 +379,14 @@ or available locally via: info '(coreutils) rm invocation'\n"""
                     )
                 continue
             basename = pname.split("/")[-1]
-            for i in dir[:]:
+            for i in directory[:]:
                 if i[fs.A_NAME] == basename:
                     if i[fs.A_TYPE] == fs.T_DIR and not recursive:
                         self.errorWrite(
                             f"rm: cannot remove `{i[fs.A_NAME]}': Is a directory\n"
                         )
                     else:
-                        dir.remove(i)
+                        directory.remove(i)
                         if verbose:
                             if i[fs.A_TYPE] == fs.T_DIR:
                                 self.write(f"removed directory '{i[fs.A_NAME]}'\n")
@@ -448,15 +460,15 @@ class Command_cp(HoneyPotCommand):
                 continue
             s = copy.deepcopy(self.fs.getfile(resolv(src)))
             if isdir:
-                dir = self.fs.get_path(resolv(dest))
+                directory = self.fs.get_path(resolv(dest))
                 outfile = os.path.basename(src)
             else:
-                dir = self.fs.get_path(os.path.dirname(resolv(dest)))
+                directory = self.fs.get_path(os.path.dirname(resolv(dest)))
                 outfile = os.path.basename(dest.rstrip("/"))
-            if outfile in [x[fs.A_NAME] for x in dir]:
-                dir.remove(next(x for x in dir if x[fs.A_NAME] == outfile))
+            if outfile in [x[fs.A_NAME] for x in directory]:
+                directory.remove(next(x for x in directory if x[fs.A_NAME] == outfile))
             s[fs.A_NAME] = outfile
-            dir.append(s)
+            directory.append(s)
 
 
 commands["/bin/cp"] = Command_cp
@@ -519,14 +531,14 @@ class Command_mv(HoneyPotCommand):
                 continue
             s = self.fs.getfile(resolv(src))
             if isdir:
-                dir = self.fs.get_path(resolv(dest))
+                directory = self.fs.get_path(resolv(dest))
                 outfile = os.path.basename(src)
             else:
-                dir = self.fs.get_path(os.path.dirname(resolv(dest)))
+                directory = self.fs.get_path(os.path.dirname(resolv(dest)))
                 outfile = os.path.basename(dest)
-            if dir != os.path.dirname(resolv(src)):
+            if directory != os.path.dirname(resolv(src)):
                 s[fs.A_NAME] = outfile
-                dir.append(s)
+                directory.append(s)
                 sdir = self.fs.get_path(os.path.dirname(resolv(src)))
                 sdir.remove(s)
             else:
@@ -549,7 +561,9 @@ class Command_mkdir(HoneyPotCommand):
                 self.errorWrite(f"mkdir: cannot create directory `{f}': File exists\n")
                 return
             try:
-                self.fs.mkdir(pname, 0, 0, 4096, 16877)
+                self.fs.mkdir(
+                    pname, self.protocol.user.uid, self.protocol.user.gid, 4096, 16877
+                )
             except fs.FileNotFound:
                 self.errorWrite(
                     f"mkdir: cannot create directory `{f}': No such file or directory\n"
@@ -575,23 +589,23 @@ class Command_rmdir(HoneyPotCommand):
                         f"rmdir: failed to remove `{f}': Directory not empty\n"
                     )
                     continue
-                dir = self.fs.get_path("/".join(pname.split("/")[:-1]))
+                directory = self.fs.get_path("/".join(pname.split("/")[:-1]))
             except (IndexError, fs.FileNotFound):
-                dir = None
+                directory = None
             fname = os.path.basename(f)
-            if not dir or fname not in [x[fs.A_NAME] for x in dir]:
+            if not directory or fname not in [x[fs.A_NAME] for x in directory]:
                 self.errorWrite(
                     f"rmdir: failed to remove `{f}': No such file or directory\n"
                 )
                 continue
-            for i in dir[:]:
+            for i in directory[:]:
                 if i[fs.A_NAME] == fname:
                     if i[fs.A_TYPE] != fs.T_DIR:
                         self.errorWrite(
                             f"rmdir: failed to remove '{f}': Not a directory\n"
                         )
                         return
-                    dir.remove(i)
+                    directory.remove(i)
                     break
 
 
@@ -637,7 +651,9 @@ class Command_touch(HoneyPotCommand):
                 self.errorWrite(f"touch: cannot touch `{pname}`: Permission denied\n")
                 return
 
-            self.fs.mkfile(pname, 0, 0, 0, 33188)
+            self.fs.mkfile(
+                pname, self.protocol.user.uid, self.protocol.user.gid, 0, 33188
+            )
 
 
 commands["/bin/touch"] = Command_touch

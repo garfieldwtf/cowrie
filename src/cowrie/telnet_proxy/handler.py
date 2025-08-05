@@ -47,7 +47,7 @@ class TelnetHandler:
 
         # definitions from config
         self.spoofAuthenticationData = CowrieConfig.getboolean(
-            "proxy", "telnet_spoof_authentication"
+            "proxy", "telnet_spoof_authentication", fallback=True
         )
 
         self.backendLogin = CowrieConfig.get("proxy", "backend_user").encode()
@@ -87,7 +87,7 @@ class TelnetHandler:
 
         # tty logging
         self.startTime = time.time()
-        self.ttylogPath = CowrieConfig.get("honeypot", "ttylog_path")
+        self.ttylogPath = CowrieConfig.get("honeypot", "ttylog_path", fallback=".")
         self.ttylogEnabled = CowrieConfig.getboolean(
             "honeypot", "ttylog", fallback=True
         )
@@ -289,7 +289,7 @@ class TelnetHandler:
                 passwordToSend = self.backendPassword
                 self.authDone = True
                 self.server.setTimeout(
-                    CowrieConfig.getint("honeypot", "interactive_timeout", fallback=300)
+                    CowrieConfig.getint("honeypot", "idle_timeout", fallback=300)
                 )
             else:
                 log.msg("Sending invalid auth to backend")

@@ -11,7 +11,7 @@ from cowrie.test.fake_transport import FakeTransport
 
 os.environ["COWRIE_HONEYPOT_DATA_PATH"] = "data"
 os.environ["COWRIE_HONEYPOT_DOWNLOAD_PATH"] = "/tmp"
-os.environ["COWRIE_SHELL_FILESYSTEM"] = "share/cowrie/fs.pickle"
+os.environ["COWRIE_SHELL_FILESYSTEM"] = "src/cowrie/data/fs.pickle"
 
 PROMPT = b"root@unitTest:~# "
 
@@ -28,7 +28,7 @@ class ShellUniqCommandTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.proto.connectionLost("tearDown From Unit Test")
+        cls.proto.connectionLost()
 
     def setUp(self) -> None:
         self.tr.clear()

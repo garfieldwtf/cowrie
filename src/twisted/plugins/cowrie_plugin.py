@@ -28,13 +28,12 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 import os
 import sys
-from typing import ClassVar
-from collections.abc import Callable
+from typing import ClassVar, TYPE_CHECKING
 
 from zope.interface import implementer, provider
-from incremental import Version
 
 from twisted._version import __version__ as __twisted_version__
 from twisted.application import service
@@ -56,10 +55,8 @@ from cowrie.core.config import CowrieConfig
 from cowrie.core.utils import create_endpoint_services, get_endpoints_from_section
 from cowrie.pool_interface.handler import PoolHandler
 
-if __twisted_version__ < Version("Twisted", 20, 0, 0):
-    raise ImportError(
-        "Your version of Twisted is too old. Please ensure your virtual environment is set up correctly."
-    )
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class Options(usage.Options):
@@ -156,13 +153,11 @@ Makes a Cowrie SSH/Telnet honeypot.
         for x in CowrieConfig.sections():
             if not x.startswith("output_"):
                 continue
-            if CowrieConfig.getboolean(x, "enabled") is False:
+            if CowrieConfig.getboolean(x, "enabled", fallback=False) is False:
                 continue
             engine: str = x.split("_")[1]
             try:
-                output = __import__(
-                    f"cowrie.output.{engine}", globals(), locals(), ["output"]
-                ).Output()
+                output = import_module(f"cowrie.output.{engine}").Output()
                 log.addObserver(output.emit)
                 self.output_plugins.append(output)
                 log.msg(f"Loaded output engine: {engine}")

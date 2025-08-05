@@ -12,13 +12,16 @@ import re
 import shlex
 import stat
 import time
-from collections.abc import Callable
 
 from twisted.internet import error
 from twisted.python import failure, log
 
 from cowrie.core.config import CowrieConfig
 from cowrie.shell import fs
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class HoneyPotCommand:
@@ -31,7 +34,7 @@ class HoneyPotCommand:
     def __init__(self, protocol, *args):
         self.protocol = protocol
         self.args = list(args)
-        self.environ = self.protocol.cmdstack[0].environ
+        self.environ = self.protocol.cmdstack[-1].environ
         self.fs = self.protocol.fs
         self.data: bytes = b""  # output data
         self.input_data: None | (
@@ -75,7 +78,13 @@ class HoneyPotCommand:
                 )
                 perm = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
                 try:
-                    self.fs.mkfile(self.outfile, 0, 0, 0, stat.S_IFREG | perm)
+                    self.fs.mkfile(
+                        self.outfile,
+                        self.protocol.user.uid,
+                        self.protocol.user.gid,
+                        0,
+                        stat.S_IFREG | perm,
+                    )
                 except fs.FileNotFound:
                     # The outfile locates at a non-existing directory.
                     self.errorWrite(
@@ -165,7 +174,8 @@ class HoneyPotCommand:
                 self.protocol.terminal.redirFiles.add((self.safeoutfile, ""))
 
         if len(self.protocol.cmdstack):
-            self.protocol.cmdstack.pop()
+            self.protocol.cmdstack.remove(self)
+
             if len(self.protocol.cmdstack):
                 self.protocol.cmdstack[-1].resume()
         else:

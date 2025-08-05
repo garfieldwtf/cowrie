@@ -11,14 +11,16 @@ import getopt
 import random
 import re
 import time
-from collections.abc import Callable
 
 from twisted.internet import error, reactor
 from twisted.python import failure, log
 
 from cowrie.core import utils
 from cowrie.shell.command import HoneyPotCommand
-from cowrie.shell.honeypot import HoneyPotShell
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 commands: dict[str, Callable] = {}
 
@@ -100,8 +102,7 @@ class Command_w(HoneyPotCommand):
             "USER     TTY      FROM              LOGIN@   IDLE   JCPU   PCPU WHAT\n"
         )
         self.write(
-            "%-8s pts/0    %s %s    0.00s  0.00s  0.00s w\n"
-            % (
+            "{:8s} pts/0    {} {}    0.00s  0.00s  0.00s w\n".format(
                 self.protocol.user.username,
                 self.protocol.clientIP[:17].ljust(17),
                 time.strftime("%H:%M", time.localtime(self.protocol.logintime)),
@@ -116,8 +117,7 @@ commands["w"] = Command_w
 class Command_who(HoneyPotCommand):
     def call(self) -> None:
         self.write(
-            "%-8s pts/0        %s %s (%s)\n"
-            % (
+            "{:8s} pts/0        {} {} ({})\n".format(
                 self.protocol.user.username,
                 time.strftime("%Y-%m-%d", time.localtime(self.protocol.logintime)),
                 time.strftime("%H:%M", time.localtime(self.protocol.logintime)),
@@ -203,19 +203,6 @@ class Command_printf(HoneyPotCommand):
 
 commands["/usr/bin/printf"] = Command_printf
 commands["printf"] = Command_printf
-
-
-class Command_exit(HoneyPotCommand):
-    def call(self) -> None:
-        stat = failure.Failure(error.ProcessDone(status=""))
-        self.protocol.terminal.transport.processEnded(stat)
-
-    def exit(self) -> None:
-        pass
-
-
-commands["exit"] = Command_exit
-commands["logout"] = Command_exit
 
 
 class Command_clear(HoneyPotCommand):
@@ -974,7 +961,7 @@ commands["history"] = Command_history
 
 class Command_date(HoneyPotCommand):
     def call(self) -> None:
-        time = datetime.datetime.utcnow()
+        time = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         self.write("{}\n".format(time.strftime("%a %b %d %H:%M:%S UTC %Y")))
 
 
@@ -1000,42 +987,6 @@ class Command_yes(HoneyPotCommand):
 
 commands["/usr/bin/yes"] = Command_yes
 commands["yes"] = Command_yes
-
-
-class Command_sh(HoneyPotCommand):
-    def call(self) -> None:
-        if self.args and self.args[0].strip() == "-c":
-            line = " ".join(self.args[1:])
-
-            # it might be sh -c 'echo "sometext"', so don't use line.strip('\'\"')
-            if (line[0] == "'" and line[-1] == "'") or (
-                line[0] == '"' and line[-1] == '"'
-            ):
-                line = line[1:-1]
-
-            self.execute_commands(line)
-
-        elif self.input_data:
-            self.execute_commands(self.input_data.decode("utf8"))
-
-        # TODO: handle spawning multiple shells, support other sh flags
-
-    def execute_commands(self, cmds: str) -> None:
-        # self.input_data holds commands passed via PIPE
-        # create new HoneyPotShell for our a new 'sh' shell
-        self.protocol.cmdstack.append(HoneyPotShell(self.protocol, interactive=False))
-
-        # call lineReceived method that indicates that we have some commands to parse
-        self.protocol.cmdstack[-1].lineReceived(cmds)
-
-        # remove the shell
-        self.protocol.cmdstack.pop()
-
-
-commands["/bin/bash"] = Command_sh
-commands["bash"] = Command_sh
-commands["/bin/sh"] = Command_sh
-commands["sh"] = Command_sh
 
 
 class Command_php(HoneyPotCommand):
