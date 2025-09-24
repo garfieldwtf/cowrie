@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import configparser
 import struct
 from typing import Any
 
@@ -59,7 +60,7 @@ class HoneyPotSSHUserAuthServer(userauth.SSHUserAuthServer):
             issuefile = CowrieConfig.get("honeypot", "contents_path") + "/etc/issue.net"
             with open(issuefile, "rb") as issue:
                 data = issue.read()
-        except OSError:
+        except (OSError, configparser.Error):
             return
         if not data or not data.strip():
             return
@@ -98,6 +99,8 @@ class HoneyPotSSHUserAuthServer(userauth.SSHUserAuthServer):
         Overridden to pass src_ip to credentials.UsernamePasswordIP
         """
         password = getNS(packet[1:])[0]
+        if password == b"\x00":
+            return None  # sshamble
         srcIp = self.transport.transport.getPeer().host  # type: ignore
         c = credentials.UsernamePasswordIP(self.user, password, srcIp)
         return self.portal.login(c, srcIp, IConchUser).addErrback(self._ebPassword)

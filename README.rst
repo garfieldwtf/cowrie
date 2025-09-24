@@ -60,8 +60,9 @@ Docker images are available on Docker Hub.
     $ docker run -p 2222:2222 cowrie/cowrie:latest
     $ ssh -p 2222 root@localhost
 
-For more detailed instructions on using Docker in Cowrie, check
-:ref:`Building Docker Images<Building Docker Images>`
+* To just make it locally, run::
+
+    $ make docker-build
 
 Requirements
 *****************************************
@@ -71,18 +72,18 @@ Software required to run locally:
 * Python 3.10+
 * python-virtualenv
 
-For Python dependencies, see `requirements.txt <https://github.com/cowrie/cowrie/blob/master/requirements.txt>`_.
+For Python dependencies, see `requirements.txt <https://github.com/cowrie/cowrie/blob/main/requirements.txt>`_.
 
 Files of interest:
 *****************************************
 
 * `etc/cowrie.cfg` - Cowrie's configuration file.
-* `etc/cowrie.cfg.dist <https://github.com/cowrie/cowrie/blob/master/etc/cowrie.cfg.dist>`_ - default settings, don't change this file
+* `etc/cowrie.cfg.dist <https://github.com/cowrie/cowrie/blob/main/etc/cowrie.cfg.dist>`_ - default settings, don't change this file
 * `etc/userdb.txt` - credentials to access the honeypot
 * `src/cowrie/data/fs.pickle` - fake filesystem, this only contains metadata (path, uid, gid, size)
-* `honeyfs/ <https://github.com/cowrie/cowrie/tree/master/honeyfs>`_ - contents for the fake filesystem
+* `honeyfs/ <https://github.com/cowrie/cowrie/tree/main/honeyfs>`_ - contents for the fake filesystem
 * `honeyfs/etc/issue.net` - pre-login banner
-* `honeyfs/etc/motd <https://github.com/cowrie/cowrie/blob/master/honeyfs/etc/issue>`_ - post-login banner
+* `honeyfs/etc/motd <https://github.com/cowrie/cowrie/blob/main/honeyfs/etc/issue>`_ - post-login banner
 * `src/cowrie/data/txtcmds/` - output for simple fake commands
 * `var/log/cowrie/cowrie.json` - audit output in JSON format
 * `var/log/cowrie/cowrie.log` - log/debug output

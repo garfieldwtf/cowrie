@@ -226,9 +226,7 @@ class HoneyPotShell:
 
         # execute the command and print to terminal
         cmd_str = " ".join(cmd_tokens)
-        self.protocol.terminal.write(
-            self.run_subshell_command(f"({cmd_str})").encode()
-        )
+        self.protocol.terminal.write(self.run_subshell_command(f"({cmd_str})").encode())
 
     def do_subshell_execution(self, start_tok: str) -> None:
         """
@@ -583,7 +581,7 @@ class HoneyPotShell:
         newbuf = ""
         if len(files) == 1:
             newbuf = " ".join(
-                line.decode("utf8").split()[:-1] + [f"{basedir}{files[0][fs.A_NAME]}"]
+                [*line.decode("utf8").split()[:-1], f"{basedir}{files[0][fs.A_NAME]}"]
             )
             if files[0][fs.A_TYPE] == fs.T_DIR:
                 newbuf += "/"
