@@ -15,7 +15,7 @@ designed to log brute force attacks and the shell interaction
 performed by the attacker. In medium interaction mode (shell) it
 emulates a UNIX system in Python, in high interaction mode (proxy)
 it functions as an SSH and telnet proxy to observe attacker behavior
-to another system.
+to another system..
 
 `Cowrie <http://github.com/cowrie/cowrie/>`_ is maintained by Michel Oosterhof.
 
